@@ -135,3 +135,74 @@ uv -g commit-push-tag ${{ github.event.inputs.version }}
 # If current version is 1.2.3, this sets it to 1.2.4
 uv -g commit-push
 ```
+
+## Library Usage
+
+You can also use `update-version` as a library in your Rust projects.
+
+```toml
+[dependencies]
+update-version = "0.1"
+```
+
+### Example: Update Cargo.toml
+
+```rust
+use semver::Version;
+use update_version::parsers::{toml_parser::TomlParser, Parser};
+
+fn main() -> anyhow::Result<()> {
+    let new_version = Version::parse("2.0.0")?;
+    TomlParser::update_version("./", &new_version)?;
+    Ok(())
+}
+```
+
+### Example: Auto-increment Version
+
+```rust
+use update_version::parsers::{toml_parser::TomlParser, Parser};
+
+fn main() -> anyhow::Result<()> {
+    // Get current version
+    let current = TomlParser::get_current_version("./")?;
+    println!("Current: {}", current);
+
+    // Increment patch version (1.2.3 -> 1.2.4)
+    TomlParser::increment_version("./")?;
+    Ok(())
+}
+```
+
+### Example: Git Release
+
+```rust
+use semver::Version;
+use update_version::{
+    arguments::GitMode,
+    git::GitTracker,
+    parsers::{toml_parser::TomlParser, Parser},
+};
+
+fn main() -> anyhow::Result<()> {
+    let version = Version::parse("1.0.0")?;
+
+    // Update version
+    TomlParser::update_version("./", &version)?;
+
+    // Commit, tag, and push
+    let git = GitTracker::open("./")?;
+    git.execute_git_mode(GitMode::CommitPushTag, &version.to_string())?;
+
+    Ok(())
+}
+```
+
+Run the included examples with:
+
+```bash
+cargo run --example update_cargo_toml
+cargo run --example increment_version
+cargo run --example update_all_types
+cargo run --example git_release
+```
