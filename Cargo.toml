@@ -2,6 +2,14 @@
 name = "update-version"
 version = "0.1.0-beta"
 edition = "2024"
+authors = ["Drew Chase"]
+description = "A CLI tool for updating version numbers across multiple file types (Cargo.toml, package.json, tauri.conf.json) with git integration"
+license = "MIT"
+repository = "https://github.com/Drew-Chase/update-version"
+homepage = "https://github.com/Drew-Chase/update-version"
+readme = "README.md"
+keywords = ["version", "semver", "cli", "cargo", "tauri"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "uv"
