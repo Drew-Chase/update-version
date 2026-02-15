@@ -16,7 +16,7 @@ impl Parser for TauriConfigParser {
 
     fn version_line_format(version: &Version) -> anyhow::Result<String> {
         Ok(format!(
-            r#""version": "{}.{}.{}""#,
+            "${{1}}{}.{}.{}\"",
             version.major, version.minor, version.patch
         ))
     }
@@ -35,7 +35,7 @@ mod tests {
   "identifier": "com.example.app"
 }"#;
         let captures = regex.captures(content).unwrap();
-        assert_eq!(captures.get(1).unwrap().as_str(), "1.0.0");
+        assert_eq!(captures.get(2).unwrap().as_str(), "1.0.0");
     }
 
     #[test]
@@ -66,13 +66,13 @@ mod tests {
         // Tauri config only uses major.minor.patch
         let version = Version::parse("1.2.3-beta.1").unwrap();
         let formatted = TauriConfigParser::version_line_format(&version).unwrap();
-        assert_eq!(formatted, r#""version": "1.2.3""#);
+        assert_eq!(formatted, "${1}1.2.3\"");
     }
 
     #[test]
     fn test_version_line_format_simple() {
         let version = Version::parse("2.0.0").unwrap();
         let formatted = TauriConfigParser::version_line_format(&version).unwrap();
-        assert_eq!(formatted, r#""version": "2.0.0""#);
+        assert_eq!(formatted, "${1}2.0.0\"");
     }
 }

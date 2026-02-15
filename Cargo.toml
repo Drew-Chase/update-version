@@ -1,6 +1,6 @@
 [package]
 name = "update-version"
-version = "0.1.0-beta"
+version = "1.0.0"
 edition = "2024"
 authors = ["Drew Chase"]
 description = "A CLI tool for updating version numbers across multiple file types (Cargo.toml, package.json, tauri.conf.json) with git integration"
@@ -25,7 +25,6 @@ anyhow = { version = "1.0.100" }
 thiserror = "2.0.17"
 pretty_env_logger = "0.5.0"
 log = "0.4.29"
-tokio = { version = "1.48.0", features = ["rt-multi-thread", "macros"] }
 clap = { version = "4.5.53", features = ["default", "wrap_help", "derive"] }
 regex = { version = "1.12.2", features = ["perf"] }
 semver = { version = "1.0.27" }

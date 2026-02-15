@@ -38,7 +38,7 @@ fn create_test_repo() -> TempDir {
 fn test_git_tracker_open() {
     let temp_dir = create_test_repo();
 
-    let tracker = GitTracker::open(temp_dir.path());
+    let tracker = GitTracker::open(temp_dir.path(), false);
     assert!(tracker.is_ok());
 }
 
@@ -46,14 +46,14 @@ fn test_git_tracker_open() {
 fn test_git_tracker_open_non_repo_fails() {
     let temp_dir = TempDir::new().unwrap();
 
-    let tracker = GitTracker::open(temp_dir.path());
+    let tracker = GitTracker::open(temp_dir.path(), false);
     assert!(tracker.is_err());
 }
 
 #[test]
 fn test_git_tracker_current_branch() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     let branch = tracker.current_branch().unwrap();
     // Default branch is usually "master" or "main"
@@ -63,7 +63,7 @@ fn test_git_tracker_current_branch() {
 #[test]
 fn test_git_tracker_stage_all() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     // Create a new file
     let new_file = temp_dir.path().join("new_file.txt");
@@ -77,7 +77,7 @@ fn test_git_tracker_stage_all() {
 #[test]
 fn test_git_tracker_create_commit() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     // Create and stage a new file
     let new_file = temp_dir.path().join("version.txt");
@@ -98,7 +98,7 @@ fn test_git_tracker_create_commit() {
 #[test]
 fn test_git_tracker_create_tag() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     // Create and stage a file
     let file = temp_dir.path().join("file.txt");
@@ -120,7 +120,7 @@ fn test_git_tracker_create_tag() {
 #[test]
 fn test_git_tracker_get_tags_empty() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     let tags = tracker.get_tags().unwrap();
     assert!(tags.is_empty());
@@ -129,7 +129,7 @@ fn test_git_tracker_get_tags_empty() {
 #[test]
 fn test_git_tracker_get_tags_multiple() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     // Create multiple commits with tags
     for version in ["1.0.0", "1.1.0", "2.0.0"] {
@@ -150,14 +150,14 @@ fn test_git_tracker_get_tags_multiple() {
 #[test]
 fn test_execute_git_mode_none_does_nothing() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     // Create a change
     let file = temp_dir.path().join("change.txt");
     fs::write(&file, "change").unwrap();
 
     // Execute with None mode
-    let result = tracker.execute_git_mode(GitMode::None, "1.0.0");
+    let result = tracker.execute_git_mode(GitMode::None, "1.0.0", &[file]);
     assert!(result.is_ok());
 
     // Verify no commit was created (still only initial commit)
@@ -170,14 +170,14 @@ fn test_execute_git_mode_none_does_nothing() {
 #[test]
 fn test_execute_git_mode_commit() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     // Create a change
     let file = temp_dir.path().join("version.txt");
     fs::write(&file, "1.0.0").unwrap();
 
     // Execute commit mode
-    let result = tracker.execute_git_mode(GitMode::Commit, "1.0.0");
+    let result = tracker.execute_git_mode(GitMode::Commit, "1.0.0", &[file]);
     assert!(result.is_ok());
 
     // Verify commit was created
@@ -190,14 +190,14 @@ fn test_execute_git_mode_commit() {
 #[test]
 fn test_execute_git_mode_commit_tag() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     // Create a change
     let file = temp_dir.path().join("version.txt");
     fs::write(&file, "2.0.0").unwrap();
 
     // Execute commit-tag mode
-    let result = tracker.execute_git_mode(GitMode::CommitTag, "2.0.0");
+    let result = tracker.execute_git_mode(GitMode::CommitTag, "2.0.0", &[file]);
     assert!(result.is_ok());
 
     // Verify commit was created
@@ -214,12 +214,12 @@ fn test_execute_git_mode_commit_tag() {
 #[test]
 fn test_execute_git_mode_no_changes() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     // Don't create any changes
 
     // Execute commit mode - should succeed but not create commit
-    let result = tracker.execute_git_mode(GitMode::Commit, "1.0.0");
+    let result = tracker.execute_git_mode(GitMode::Commit, "1.0.0", &[]);
     assert!(result.is_ok());
 
     // Verify no new commit (still only initial)
@@ -232,7 +232,7 @@ fn test_execute_git_mode_no_changes() {
 #[test]
 fn test_duplicate_tag_fails() {
     let temp_dir = create_test_repo();
-    let tracker = GitTracker::open(temp_dir.path()).unwrap();
+    let tracker = GitTracker::open(temp_dir.path(), false).unwrap();
 
     // Create first commit and tag
     let file1 = temp_dir.path().join("v1.txt");

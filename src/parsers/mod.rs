@@ -9,7 +9,8 @@ pub mod tauri_config_parser;
 pub mod toml_parser;
 
 #[derive(Debug, Error)]
-enum ParsingError {
+#[non_exhaustive]
+pub enum ParsingError {
     #[error("No versions found in directory: {0}")]
     NoVersionFoundError(String),
 }
@@ -45,7 +46,12 @@ pub trait Parser {
         let path = path.as_ref();
         let current_version = Self::get_current_version(path, options)?;
         let mut new_version = current_version.clone();
-        new_version.patch += 1;
+        if current_version.pre.is_empty() {
+            new_version.patch += 1;
+        } else {
+            new_version.pre = semver::Prerelease::EMPTY;
+        }
+        new_version.build = semver::BuildMetadata::EMPTY;
         debug!(
             "Incrementing version from {} -> {}",
             current_version, new_version
@@ -60,7 +66,7 @@ pub trait Parser {
         for file in files {
             let contents = std::fs::read_to_string(file)?;
             if let Some(captures) = version_regex.captures(contents.as_str())
-                && let Some(version) = captures.get(1)
+                && let Some(version) = captures.get(2)
             {
                 let version = version.as_str();
                 debug!("Found current version: {}", version);
@@ -80,7 +86,11 @@ pub trait Parser {
         let mut builder = ignore::WalkBuilder::new(path);
 
         if options.no_ignore {
-            builder.standard_filters(false);
+            // Disable ignore file processing but keep hidden file filtering
+            // so .git/ and other hidden directories are still skipped
+            builder.git_ignore(false);
+            builder.git_global(false);
+            builder.git_exclude(false);
         } else {
             builder.add_custom_ignore_filename(".uvignore");
         }
@@ -92,6 +102,12 @@ pub trait Parser {
                 files.push(path.to_path_buf());
             }
         }
+
+        // Sort by path depth (shallowest first) then lexicographically for deterministic ordering
+        files.sort_by(|a, b| {
+            a.components().count().cmp(&b.components().count())
+                .then_with(|| a.cmp(b))
+        });
 
         debug!("Found files: {:?}", files);
         Ok(files)

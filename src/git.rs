@@ -2,28 +2,29 @@ use anyhow::{Context, Result};
 use git2::{Cred, CredentialType, FetchOptions, PushOptions, RemoteCallbacks, Repository, Signature};
 use log::{debug, info, warn};
 use std::cell::Cell;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::arguments::GitMode;
 
 pub struct GitTracker {
     pub repository: Repository,
+    pub allow_insecure: bool,
 }
 
 impl GitTracker {
     /// Opens an existing repository at the given path
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn open(path: impl AsRef<Path>, allow_insecure: bool) -> Result<Self> {
         let path = path.as_ref();
         let repository = Repository::discover(path)
             .with_context(|| format!("Failed to find git repository at {:?}", path))?;
 
         debug!("Opened repository at {:?}", repository.path());
 
-        Ok(GitTracker { repository })
+        Ok(GitTracker { repository, allow_insecure })
     }
 
     /// Creates authentication callbacks that use local git credentials
-    fn create_auth_callbacks() -> RemoteCallbacks<'static> {
+    fn create_auth_callbacks(allow_insecure: bool) -> RemoteCallbacks<'static> {
         let mut callbacks = RemoteCallbacks::new();
         let attempts = Cell::new(0u32);
 
@@ -96,8 +97,9 @@ impl GitTracker {
             Err(git2::Error::from_str("no suitable credentials found"))
         });
 
-        // Accept all certificates (needed for self-hosted git servers with custom CAs)
-        callbacks.certificate_check(|_cert, _host| Ok(git2::CertificateCheckStatus::CertificateOk));
+        if allow_insecure {
+            callbacks.certificate_check(|_cert, _host| Ok(git2::CertificateCheckStatus::CertificateOk));
+        }
 
         callbacks
     }
@@ -116,6 +118,23 @@ impl GitTracker {
         index.write()?;
 
         debug!("Staged all changes");
+        Ok(())
+    }
+
+    /// Stages only the specified files in the repository
+    pub fn stage_files(&self, files: &[PathBuf]) -> Result<()> {
+        let repo_root = self.repository.workdir()
+            .ok_or_else(|| anyhow::anyhow!("Bare repository not supported"))?;
+        let mut index = self.repository.index()?;
+
+        for file in files {
+            let relative = file.strip_prefix(repo_root)
+                .with_context(|| format!("File {:?} is not inside repository root {:?}", file, repo_root))?;
+            index.add_path(relative)?;
+        }
+        index.write()?;
+
+        debug!("Staged {} files", files.len());
         Ok(())
     }
 
@@ -179,7 +198,7 @@ impl GitTracker {
         let mut remote = self.repository.find_remote(remote_name)
             .with_context(|| format!("Remote '{}' not found", remote_name))?;
 
-        let callbacks = Self::create_auth_callbacks();
+        let callbacks = Self::create_auth_callbacks(self.allow_insecure);
         let mut push_options = PushOptions::new();
         push_options.remote_callbacks(callbacks);
 
@@ -197,7 +216,7 @@ impl GitTracker {
         let mut remote = self.repository.find_remote(remote_name)
             .with_context(|| format!("Remote '{}' not found", remote_name))?;
 
-        let callbacks = Self::create_auth_callbacks();
+        let callbacks = Self::create_auth_callbacks(self.allow_insecure);
         let mut push_options = PushOptions::new();
         push_options.remote_callbacks(callbacks);
 
@@ -217,14 +236,14 @@ impl GitTracker {
     }
 
     /// Executes git operations based on the GitMode and version
-    pub fn execute_git_mode(&self, mode: GitMode, version: &str) -> Result<()> {
+    pub fn execute_git_mode(&self, mode: GitMode, version: &str, files: &[PathBuf]) -> Result<()> {
         if mode == GitMode::None {
             debug!("GitMode::None - skipping git operations");
             return Ok(());
         }
 
-        // Stage all changes first
-        self.stage_all()?;
+        // Stage only the files that were modified by version updates
+        self.stage_files(files)?;
 
         // Check if there are changes to commit
         let statuses = self.repository.statuses(None)?;
@@ -265,7 +284,7 @@ impl GitTracker {
 
         let mut remote = self.repository.find_remote(remote_name)?;
 
-        let callbacks = Self::create_auth_callbacks();
+        let callbacks = Self::create_auth_callbacks(self.allow_insecure);
         let mut fetch_options = FetchOptions::new();
         fetch_options.remote_callbacks(callbacks);
 

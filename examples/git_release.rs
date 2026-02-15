@@ -15,14 +15,14 @@ fn main() -> Result<()> {
 
     // Update version in Cargo.toml
     println!("Updating version to {}...", new_version);
-    TomlParser::update_version("./", &new_version, &WalkOptions::default())?;
+    let modified_files = TomlParser::update_version("./", &new_version, &WalkOptions::default())?;
 
     // Open the git repository
-    let git = GitTracker::open("./")?;
+    let git = GitTracker::open("./", false)?;
 
     // Execute git operations: commit, tag, and push
     // Change to GitMode::Commit or GitMode::CommitTag if you don't want to push
-    git.execute_git_mode(GitMode::CommitPushTag, &new_version.to_string())?;
+    git.execute_git_mode(GitMode::CommitPushTag, &new_version.to_string(), &modified_files)?;
 
     println!("Release v{} created and pushed!", new_version);
 

@@ -33,6 +33,9 @@ pub struct Arguments {
     /// Disable .gitignore and .uvignore file processing during file discovery
     #[arg(long)]
     pub no_ignore: bool,
+    /// Disable TLS certificate verification for git operations
+    #[arg(long)]
+    pub allow_insecure: bool,
     pub new_version: Option<String>,
 }
 
@@ -47,6 +50,7 @@ mod tests {
         assert_eq!(args.git_mode, GitMode::None);
         assert_eq!(args.path, "./");
         assert!(!args.verbose);
+        assert!(!args.allow_insecure);
         assert!(args.new_version.is_none());
     }
 

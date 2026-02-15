@@ -36,7 +36,7 @@ edition = "2021"
     assert_eq!(updated[0], cargo_toml);
 
     let content = fs::read_to_string(&cargo_toml).unwrap();
-    assert!(content.contains(r#"version="2.0.0""#));
+    assert!(content.contains(r#"version = "2.0.0""#));
 }
 
 #[test]
@@ -56,7 +56,7 @@ version = "1.2.3"
     TomlParser::increment_version(temp_dir.path(), &WalkOptions::default()).unwrap();
 
     let content = fs::read_to_string(&cargo_toml).unwrap();
-    assert!(content.contains(r#"version="1.2.4""#));
+    assert!(content.contains(r#"version = "1.2.4""#));
 }
 
 #[test]
@@ -116,8 +116,8 @@ version = "1.0.0"
     let root_content = fs::read_to_string(&root_toml).unwrap();
     let sub_content = fs::read_to_string(&sub_toml).unwrap();
 
-    assert!(root_content.contains(r#"version="2.0.0""#));
-    assert!(sub_content.contains(r#"version="2.0.0""#));
+    assert!(root_content.contains(r#"version = "2.0.0""#));
+    assert!(sub_content.contains(r#"version = "2.0.0""#));
 }
 
 // ============================================================================

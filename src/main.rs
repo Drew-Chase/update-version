@@ -12,8 +12,7 @@ use update_version::{
     },
 };
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let args = Arguments::parse();
     pretty_env_logger::env_logger::builder()
         .filter_level(if args.verbose { LevelFilter::Debug } else { LevelFilter::Info })
@@ -33,27 +32,29 @@ async fn main() -> Result<()> {
         }
     };
 
+    let mut modified_files = Vec::new();
+
     match args.supported_types {
         SupportedTypes::All => {
-            apply_version::<TomlParser>(path, version.as_ref(), &walk_options)?;
-            apply_version::<PackageJsonParser>(path, version.as_ref(), &walk_options)?;
-            apply_version::<TauriConfigParser>(path, version.as_ref(), &walk_options)?;
+            modified_files.extend(apply_version::<TomlParser>(path, &final_version, &walk_options)?);
+            modified_files.extend(apply_version::<PackageJsonParser>(path, &final_version, &walk_options)?);
+            modified_files.extend(apply_version::<TauriConfigParser>(path, &final_version, &walk_options)?);
         }
         SupportedTypes::TOML => {
-            apply_version::<TomlParser>(path, version.as_ref(), &walk_options)?
+            modified_files.extend(apply_version::<TomlParser>(path, &final_version, &walk_options)?);
         }
         SupportedTypes::PackageJSON => {
-            apply_version::<PackageJsonParser>(path, version.as_ref(), &walk_options)?
+            modified_files.extend(apply_version::<PackageJsonParser>(path, &final_version, &walk_options)?);
         }
         SupportedTypes::TauriConfig => {
-            apply_version::<TauriConfigParser>(path, version.as_ref(), &walk_options)?
+            modified_files.extend(apply_version::<TauriConfigParser>(path, &final_version, &walk_options)?);
         }
     }
 
     // Handle git operations if mode is not None
     if args.git_mode != GitMode::None {
-        let git = GitTracker::open(&args.path)?;
-        git.execute_git_mode(args.git_mode, &final_version.to_string())?;
+        let git = GitTracker::open(&args.path, args.allow_insecure)?;
+        git.execute_git_mode(args.git_mode, &final_version.to_string(), &modified_files)?;
     }
 
     Ok(())
@@ -61,18 +62,10 @@ async fn main() -> Result<()> {
 
 fn apply_version<P: UpdateVersionParser>(
     path: &Path,
-    version: Option<&Version>,
+    version: &Version,
     options: &WalkOptions,
-) -> Result<()> {
-    match version {
-        Some(v) => {
-            P::update_version(path, v, options)?;
-        }
-        None => {
-            P::increment_version(path, options)?;
-        }
-    }
-    Ok(())
+) -> Result<Vec<std::path::PathBuf>> {
+    Ok(P::update_version(path, version, options)?)
 }
 
 /// Gets the next version by reading current version and incrementing patch
@@ -92,8 +85,12 @@ fn get_next_version(
         SupportedTypes::TauriConfig => TauriConfigParser::get_current_version(path, options),
     }?;
 
-    // Increment patch version
     let mut next = current;
-    next.patch += 1;
+    if next.pre.is_empty() {
+        next.patch += 1;
+    } else {
+        next.pre = semver::Prerelease::EMPTY;
+    }
+    next.build = semver::BuildMetadata::EMPTY;
     Ok(next)
 }
