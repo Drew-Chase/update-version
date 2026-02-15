@@ -139,8 +139,23 @@ impl GitTracker {
             }
             index.add_path(relative)?;
 
-            // If a Cargo.toml was staged, also stage its sibling Cargo.lock
+            // If a Cargo.toml was staged, run `cargo update` and stage the Cargo.lock
             if relative.file_name().is_some_and(|n| n.eq_ignore_ascii_case("Cargo.toml")) {
+                let cargo_dir = abs_path.parent().unwrap_or(&abs_path);
+                debug!("Running `cargo update` in {:?}", cargo_dir);
+                let status = std::process::Command::new("cargo")
+                    .arg("update")
+                    .arg("--workspace")
+                    .current_dir(cargo_dir)
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status();
+                match status {
+                    Ok(s) if s.success() => debug!("cargo update succeeded"),
+                    Ok(s) => warn!("cargo update exited with status: {}", s),
+                    Err(e) => warn!("Failed to run cargo update: {}", e),
+                }
+
                 let lock_path = abs_path.with_file_name("Cargo.lock");
                 if lock_path.exists() {
                     let lock_relative = lock_path.strip_prefix(&repo_root)
