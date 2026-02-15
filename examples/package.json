@@ -1,6 +1,6 @@
 {
   "name": "ffnodes",
-"version": "1.0.2",
+"version": "1.0.3",
   "description": "Distributed video encoding system using FFmpeg",
   "private": true,
   "workspaces": [
