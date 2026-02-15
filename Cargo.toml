@@ -29,7 +29,7 @@ clap = { version = "4.5.53", features = ["default", "wrap_help", "derive"] }
 regex = { version = "1.12.2", features = ["perf"] }
 semver = { version = "1.0.27" }
 ignore = { version = "0.4" }
-git2 = { version = "0.20.3" }
+git2 = { version = "0.20.4" }
 dirs = "6.0"
 
 [dev-dependencies]
