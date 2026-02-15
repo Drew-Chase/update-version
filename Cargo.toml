@@ -1,6 +1,6 @@
 [package]
 name = "update-version"
-version = "1.0.3"
+version = "1.0.4"
 edition = "2024"
 authors = ["Drew Chase"]
 description = "A CLI tool for updating version numbers across multiple file types (Cargo.toml, package.json, tauri.conf.json) with git integration"
