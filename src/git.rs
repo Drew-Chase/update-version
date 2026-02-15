@@ -133,7 +133,24 @@ impl GitTracker {
                 .with_context(|| format!("Failed to resolve path {:?}", file))?;
             let relative = abs_path.strip_prefix(&repo_root)
                 .with_context(|| format!("File {:?} is not inside repository root {:?}", abs_path, repo_root))?;
+            if self.repository.is_path_ignored(relative).unwrap_or(false) {
+                debug!("Skipping gitignored file: {:?}", relative);
+                continue;
+            }
             index.add_path(relative)?;
+
+            // If a Cargo.toml was staged, also stage its sibling Cargo.lock
+            if relative.file_name().is_some_and(|n| n.eq_ignore_ascii_case("Cargo.toml")) {
+                let lock_path = abs_path.with_file_name("Cargo.lock");
+                if lock_path.exists() {
+                    let lock_relative = lock_path.strip_prefix(&repo_root)
+                        .with_context(|| format!("File {:?} is not inside repository root {:?}", lock_path, repo_root))?;
+                    if !self.repository.is_path_ignored(lock_relative).unwrap_or(false) {
+                        debug!("Also staging Cargo.lock: {:?}", lock_relative);
+                        index.add_path(lock_relative)?;
+                    }
+                }
+            }
         }
         index.write()?;
 
