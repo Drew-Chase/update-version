@@ -124,12 +124,15 @@ impl GitTracker {
     /// Stages only the specified files in the repository
     pub fn stage_files(&self, files: &[PathBuf]) -> Result<()> {
         let repo_root = self.repository.workdir()
-            .ok_or_else(|| anyhow::anyhow!("Bare repository not supported"))?;
+            .ok_or_else(|| anyhow::anyhow!("Bare repository not supported"))?
+            .canonicalize()?;
         let mut index = self.repository.index()?;
 
         for file in files {
-            let relative = file.strip_prefix(repo_root)
-                .with_context(|| format!("File {:?} is not inside repository root {:?}", file, repo_root))?;
+            let abs_path = file.canonicalize()
+                .with_context(|| format!("Failed to resolve path {:?}", file))?;
+            let relative = abs_path.strip_prefix(&repo_root)
+                .with_context(|| format!("File {:?} is not inside repository root {:?}", abs_path, repo_root))?;
             index.add_path(relative)?;
         }
         index.write()?;
