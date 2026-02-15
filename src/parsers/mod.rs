@@ -23,6 +23,44 @@ pub struct WalkOptions {
     pub no_ignore: bool,
 }
 
+/// Increments a semver version, preserving prerelease labels.
+///
+/// - `1.2.3` → `1.2.4` (no prerelease: bump patch)
+/// - `1.0.0-alpha.0` → `1.0.0-alpha.1` (numeric prerelease suffix: bump it)
+/// - `1.0.0-alpha` → `1.0.1-alpha` (non-numeric prerelease: bump patch, keep label)
+pub fn increment_semver(version: &Version) -> Result<Version> {
+    let mut next = version.clone();
+    next.build = semver::BuildMetadata::EMPTY;
+
+    if version.pre.is_empty() {
+        next.patch += 1;
+        return Ok(next);
+    }
+
+    // Split prerelease into dot-separated identifiers
+    let pre_str = version.pre.as_str();
+    let parts: Vec<&str> = pre_str.split('.').collect();
+
+    // Check if the last identifier is numeric
+    if let Some(last) = parts.last() {
+        if let Ok(n) = last.parse::<u64>() {
+            // Increment the numeric suffix: alpha.0 -> alpha.1
+            let prefix = &parts[..parts.len() - 1];
+            let new_pre = if prefix.is_empty() {
+                format!("{}", n + 1)
+            } else {
+                format!("{}.{}", prefix.join("."), n + 1)
+            };
+            next.pre = semver::Prerelease::new(&new_pre)?;
+            return Ok(next);
+        }
+    }
+
+    // Non-numeric prerelease (e.g. "alpha"): bump patch, keep label
+    next.patch += 1;
+    Ok(next)
+}
+
 pub trait Parser {
     fn update_version(
         path: impl AsRef<Path>,
@@ -45,13 +83,7 @@ pub trait Parser {
     fn increment_version(path: impl AsRef<Path>, options: &WalkOptions) -> Result<Vec<PathBuf>> {
         let path = path.as_ref();
         let current_version = Self::get_current_version(path, options)?;
-        let mut new_version = current_version.clone();
-        if current_version.pre.is_empty() {
-            new_version.patch += 1;
-        } else {
-            new_version.pre = semver::Prerelease::EMPTY;
-        }
-        new_version.build = semver::BuildMetadata::EMPTY;
+        let new_version = increment_semver(&current_version)?;
         debug!(
             "Incrementing version from {} -> {}",
             current_version, new_version

@@ -7,8 +7,9 @@ use update_version::{
     arguments::{Arguments, GitMode, SupportedTypes},
     git::GitTracker,
     parsers::{
-        Parser as UpdateVersionParser, WalkOptions, package_json_parser::PackageJsonParser,
-        tauri_config_parser::TauriConfigParser, toml_parser::TomlParser,
+        Parser as UpdateVersionParser, WalkOptions, increment_semver,
+        package_json_parser::PackageJsonParser, tauri_config_parser::TauriConfigParser,
+        toml_parser::TomlParser,
     },
 };
 
@@ -85,12 +86,5 @@ fn get_next_version(
         SupportedTypes::TauriConfig => TauriConfigParser::get_current_version(path, options),
     }?;
 
-    let mut next = current;
-    if next.pre.is_empty() {
-        next.patch += 1;
-    } else {
-        next.pre = semver::Prerelease::EMPTY;
-    }
-    next.build = semver::BuildMetadata::EMPTY;
-    Ok(next)
+    increment_semver(&current)
 }
