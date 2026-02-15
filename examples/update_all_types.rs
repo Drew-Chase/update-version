@@ -5,18 +5,19 @@
 use anyhow::Result;
 use semver::Version;
 use update_version::parsers::{
-    package_json_parser::PackageJsonParser, tauri_config_parser::TauriConfigParser,
+    WalkOptions, package_json_parser::PackageJsonParser, tauri_config_parser::TauriConfigParser,
     toml_parser::TomlParser, Parser,
 };
 
 fn main() -> Result<()> {
     let new_version = Version::parse("3.0.0")?;
     let project_path = "./";
+    let options = WalkOptions::default();
 
     println!("Updating all files to version {}...\n", new_version);
 
     // Update Cargo.toml files
-    match TomlParser::update_version(project_path, &new_version) {
+    match TomlParser::update_version(project_path, &new_version, &options) {
         Ok(files) => {
             println!("TOML files updated:");
             for file in files {
@@ -27,7 +28,7 @@ fn main() -> Result<()> {
     }
 
     // Update package.json files
-    match PackageJsonParser::update_version(project_path, &new_version) {
+    match PackageJsonParser::update_version(project_path, &new_version, &options) {
         Ok(files) => {
             println!("\npackage.json files updated:");
             for file in files {
@@ -38,7 +39,7 @@ fn main() -> Result<()> {
     }
 
     // Update tauri.conf.json files
-    match TauriConfigParser::update_version(project_path, &new_version) {
+    match TauriConfigParser::update_version(project_path, &new_version, &options) {
         Ok(files) => {
             println!("\ntauri.conf.json files updated:");
             for file in files {

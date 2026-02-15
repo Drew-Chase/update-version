@@ -4,7 +4,7 @@ use semver::Version;
 use std::fs;
 use tempfile::TempDir;
 use update_version::parsers::{
-    package_json_parser::PackageJsonParser, tauri_config_parser::TauriConfigParser,
+    WalkOptions, package_json_parser::PackageJsonParser, tauri_config_parser::TauriConfigParser,
     toml_parser::TomlParser, Parser,
 };
 
@@ -28,7 +28,9 @@ edition = "2021"
     .unwrap();
 
     let new_version = Version::parse("2.0.0").unwrap();
-    let updated = TomlParser::update_version(temp_dir.path(), &new_version).unwrap();
+    let updated =
+        TomlParser::update_version(temp_dir.path(), &new_version, &WalkOptions::default())
+            .unwrap();
 
     assert_eq!(updated.len(), 1);
     assert_eq!(updated[0], cargo_toml);
@@ -51,7 +53,7 @@ version = "1.2.3"
     )
     .unwrap();
 
-    TomlParser::increment_version(temp_dir.path()).unwrap();
+    TomlParser::increment_version(temp_dir.path(), &WalkOptions::default()).unwrap();
 
     let content = fs::read_to_string(&cargo_toml).unwrap();
     assert!(content.contains(r#"version="1.2.4""#));
@@ -71,7 +73,8 @@ version = "3.2.1"
     )
     .unwrap();
 
-    let version = TomlParser::get_current_version(temp_dir.path()).unwrap();
+    let version =
+        TomlParser::get_current_version(temp_dir.path(), &WalkOptions::default()).unwrap();
     assert_eq!(version, Version::parse("3.2.1").unwrap());
 }
 
@@ -104,7 +107,9 @@ version = "1.0.0"
     .unwrap();
 
     let new_version = Version::parse("2.0.0").unwrap();
-    let updated = TomlParser::update_version(temp_dir.path(), &new_version).unwrap();
+    let updated =
+        TomlParser::update_version(temp_dir.path(), &new_version, &WalkOptions::default())
+            .unwrap();
 
     assert_eq!(updated.len(), 2);
 
@@ -135,7 +140,9 @@ fn test_package_json_update_version() {
     .unwrap();
 
     let new_version = Version::parse("2.0.0").unwrap();
-    let updated = PackageJsonParser::update_version(temp_dir.path(), &new_version).unwrap();
+    let updated =
+        PackageJsonParser::update_version(temp_dir.path(), &new_version, &WalkOptions::default())
+            .unwrap();
 
     assert_eq!(updated.len(), 1);
 
@@ -157,7 +164,7 @@ fn test_package_json_increment_version() {
     )
     .unwrap();
 
-    PackageJsonParser::increment_version(temp_dir.path()).unwrap();
+    PackageJsonParser::increment_version(temp_dir.path(), &WalkOptions::default()).unwrap();
 
     let content = fs::read_to_string(&package_json).unwrap();
     assert!(content.contains(r#""version": "0.1.1""#));
@@ -177,7 +184,8 @@ fn test_package_json_get_current_version() {
     )
     .unwrap();
 
-    let version = PackageJsonParser::get_current_version(temp_dir.path()).unwrap();
+    let version =
+        PackageJsonParser::get_current_version(temp_dir.path(), &WalkOptions::default()).unwrap();
     assert_eq!(version, Version::parse("5.4.3").unwrap());
 }
 
@@ -201,7 +209,9 @@ fn test_tauri_config_update_version() {
     .unwrap();
 
     let new_version = Version::parse("2.0.0").unwrap();
-    let updated = TauriConfigParser::update_version(temp_dir.path(), &new_version).unwrap();
+    let updated =
+        TauriConfigParser::update_version(temp_dir.path(), &new_version, &WalkOptions::default())
+            .unwrap();
 
     assert_eq!(updated.len(), 1);
 
@@ -224,7 +234,8 @@ fn test_tauri_config_strips_prerelease() {
 
     // Tauri doesn't support prerelease versions, so they should be stripped
     let new_version = Version::parse("2.0.0-beta.1").unwrap();
-    TauriConfigParser::update_version(temp_dir.path(), &new_version).unwrap();
+    TauriConfigParser::update_version(temp_dir.path(), &new_version, &WalkOptions::default())
+        .unwrap();
 
     let content = fs::read_to_string(&tauri_conf).unwrap();
     assert!(content.contains(r#""version": "2.0.0""#));
@@ -240,7 +251,7 @@ fn test_no_matching_files_returns_error() {
     let temp_dir = TempDir::new().unwrap();
 
     // Empty directory - no Cargo.toml
-    let result = TomlParser::get_current_version(temp_dir.path());
+    let result = TomlParser::get_current_version(temp_dir.path(), &WalkOptions::default());
     assert!(result.is_err());
 }
 
@@ -259,7 +270,7 @@ edition = "2021"
     )
     .unwrap();
 
-    let result = TomlParser::get_current_version(temp_dir.path());
+    let result = TomlParser::get_current_version(temp_dir.path(), &WalkOptions::default());
     assert!(result.is_err());
 }
 
@@ -285,7 +296,7 @@ serde = "1.0"
     fs::write(&cargo_toml, original).unwrap();
 
     let new_version = Version::parse("2.0.0").unwrap();
-    TomlParser::update_version(temp_dir.path(), &new_version).unwrap();
+    TomlParser::update_version(temp_dir.path(), &new_version, &WalkOptions::default()).unwrap();
 
     let content = fs::read_to_string(&cargo_toml).unwrap();
 
@@ -310,9 +321,134 @@ version = "1.0.0-alpha.1"
     )
     .unwrap();
 
-    let version = TomlParser::get_current_version(temp_dir.path()).unwrap();
+    let version =
+        TomlParser::get_current_version(temp_dir.path(), &WalkOptions::default()).unwrap();
     assert_eq!(version.major, 1);
     assert_eq!(version.minor, 0);
     assert_eq!(version.patch, 0);
     assert!(!version.pre.is_empty());
+}
+
+// ============================================================================
+// Ignore File Tests
+// ============================================================================
+
+#[test]
+fn test_uvignore_excludes_directory() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let root_toml = temp_dir.path().join("Cargo.toml");
+    fs::write(
+        &root_toml,
+        r#"[package]
+name = "root"
+version = "1.0.0"
+"#,
+    )
+    .unwrap();
+
+    // Create .uvignore that ignores "vendor/"
+    fs::write(temp_dir.path().join(".uvignore"), "vendor/\n").unwrap();
+
+    // Create vendor/Cargo.toml which should be ignored
+    let vendor_dir = temp_dir.path().join("vendor");
+    fs::create_dir_all(&vendor_dir).unwrap();
+    fs::write(
+        vendor_dir.join("Cargo.toml"),
+        r#"[package]
+name = "vendored"
+version = "1.0.0"
+"#,
+    )
+    .unwrap();
+
+    let new_version = Version::parse("2.0.0").unwrap();
+    let updated =
+        TomlParser::update_version(temp_dir.path(), &new_version, &WalkOptions::default())
+            .unwrap();
+
+    // Only root should be updated, vendor should be ignored
+    assert_eq!(updated.len(), 1);
+    assert_eq!(updated[0], root_toml);
+
+    // Verify vendor file was NOT modified
+    let vendor_content = fs::read_to_string(vendor_dir.join("Cargo.toml")).unwrap();
+    assert!(vendor_content.contains(r#"version = "1.0.0""#));
+}
+
+#[test]
+fn test_gitignore_excludes_directory() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let root_toml = temp_dir.path().join("Cargo.toml");
+    fs::write(
+        &root_toml,
+        r#"[package]
+name = "root"
+version = "1.0.0"
+"#,
+    )
+    .unwrap();
+
+    // Initialize a git repo (required for gitignore processing)
+    fs::create_dir(temp_dir.path().join(".git")).unwrap();
+
+    // Create .gitignore that ignores "target/"
+    fs::write(temp_dir.path().join(".gitignore"), "target/\n").unwrap();
+
+    // Create target/Cargo.toml which should be ignored
+    let target_dir = temp_dir.path().join("target");
+    fs::create_dir_all(&target_dir).unwrap();
+    fs::write(
+        target_dir.join("Cargo.toml"),
+        r#"[package]
+name = "built"
+version = "1.0.0"
+"#,
+    )
+    .unwrap();
+
+    let new_version = Version::parse("2.0.0").unwrap();
+    let updated =
+        TomlParser::update_version(temp_dir.path(), &new_version, &WalkOptions::default())
+            .unwrap();
+
+    assert_eq!(updated.len(), 1);
+    assert_eq!(updated[0], root_toml);
+}
+
+#[test]
+fn test_no_ignore_walks_everything() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let root_toml = temp_dir.path().join("Cargo.toml");
+    fs::write(
+        &root_toml,
+        r#"[package]
+name = "root"
+version = "1.0.0"
+"#,
+    )
+    .unwrap();
+
+    // Create .uvignore that ignores "sub/"
+    fs::write(temp_dir.path().join(".uvignore"), "sub/\n").unwrap();
+
+    let sub_dir = temp_dir.path().join("sub");
+    fs::create_dir_all(&sub_dir).unwrap();
+    fs::write(
+        sub_dir.join("Cargo.toml"),
+        r#"[package]
+name = "sub"
+version = "1.0.0"
+"#,
+    )
+    .unwrap();
+
+    let options = WalkOptions { no_ignore: true };
+    let new_version = Version::parse("2.0.0").unwrap();
+    let updated = TomlParser::update_version(temp_dir.path(), &new_version, &options).unwrap();
+
+    // Both files found since ignores are disabled
+    assert_eq!(updated.len(), 2);
 }

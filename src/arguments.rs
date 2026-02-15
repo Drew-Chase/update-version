@@ -30,6 +30,9 @@ pub struct Arguments {
     pub path: String,
     #[arg(long, short)]
     pub verbose: bool,
+    /// Disable .gitignore and .uvignore file processing during file discovery
+    #[arg(long)]
+    pub no_ignore: bool,
     pub new_version: Option<String>,
 }
 

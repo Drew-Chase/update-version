@@ -7,7 +7,7 @@ use semver::Version;
 use update_version::{
     arguments::GitMode,
     git::GitTracker,
-    parsers::{toml_parser::TomlParser, Parser},
+    parsers::{WalkOptions, toml_parser::TomlParser, Parser},
 };
 
 fn main() -> Result<()> {
@@ -15,7 +15,7 @@ fn main() -> Result<()> {
 
     // Update version in Cargo.toml
     println!("Updating version to {}...", new_version);
-    TomlParser::update_version("./", &new_version)?;
+    TomlParser::update_version("./", &new_version, &WalkOptions::default())?;
 
     // Open the git repository
     let git = GitTracker::open("./")?;

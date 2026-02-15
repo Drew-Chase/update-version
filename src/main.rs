@@ -7,7 +7,7 @@ use update_version::{
     arguments::{Arguments, GitMode, SupportedTypes},
     git::GitTracker,
     parsers::{
-        Parser as UpdateVersionParser, package_json_parser::PackageJsonParser,
+        Parser as UpdateVersionParser, WalkOptions, package_json_parser::PackageJsonParser,
         tauri_config_parser::TauriConfigParser, toml_parser::TomlParser,
     },
 };
@@ -20,6 +20,7 @@ async fn main() -> Result<()> {
         .format_timestamp(None)
         .init();
 
+    let walk_options = WalkOptions { no_ignore: args.no_ignore };
     let version = args.new_version.map(|v| Version::parse(&v)).transpose()?;
     let path: &Path = args.path.as_ref();
 
@@ -28,24 +29,24 @@ async fn main() -> Result<()> {
         Some(v) => v.clone(),
         None => {
             // Get current version from first available parser to determine what we'll increment to
-            get_next_version(path, &args.supported_types)?
+            get_next_version(path, &args.supported_types, &walk_options)?
         }
     };
 
     match args.supported_types {
         SupportedTypes::All => {
-            apply_version::<TomlParser>(path, version.as_ref())?;
-            apply_version::<PackageJsonParser>(path, version.as_ref())?;
-            apply_version::<TauriConfigParser>(path, version.as_ref())?;
+            apply_version::<TomlParser>(path, version.as_ref(), &walk_options)?;
+            apply_version::<PackageJsonParser>(path, version.as_ref(), &walk_options)?;
+            apply_version::<TauriConfigParser>(path, version.as_ref(), &walk_options)?;
         }
         SupportedTypes::TOML => {
-            apply_version::<TomlParser>(path, version.as_ref())?
+            apply_version::<TomlParser>(path, version.as_ref(), &walk_options)?
         }
         SupportedTypes::PackageJSON => {
-            apply_version::<PackageJsonParser>(path, version.as_ref())?
+            apply_version::<PackageJsonParser>(path, version.as_ref(), &walk_options)?
         }
         SupportedTypes::TauriConfig => {
-            apply_version::<TauriConfigParser>(path, version.as_ref())?
+            apply_version::<TauriConfigParser>(path, version.as_ref(), &walk_options)?
         }
     }
 
@@ -58,29 +59,37 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn apply_version<P: UpdateVersionParser>(path: &Path, version: Option<&Version>) -> Result<()> {
+fn apply_version<P: UpdateVersionParser>(
+    path: &Path,
+    version: Option<&Version>,
+    options: &WalkOptions,
+) -> Result<()> {
     match version {
         Some(v) => {
-            P::update_version(path, v)?;
+            P::update_version(path, v, options)?;
         }
         None => {
-            P::increment_version(path)?;
+            P::increment_version(path, options)?;
         }
     }
     Ok(())
 }
 
 /// Gets the next version by reading current version and incrementing patch
-fn get_next_version(path: &Path, supported_types: &SupportedTypes) -> Result<Version> {
+fn get_next_version(
+    path: &Path,
+    supported_types: &SupportedTypes,
+    options: &WalkOptions,
+) -> Result<Version> {
     // Try to get current version from available parsers
     let current = match supported_types {
         SupportedTypes::All | SupportedTypes::TOML => {
-            TomlParser::get_current_version(path)
-                .or_else(|_| PackageJsonParser::get_current_version(path))
-                .or_else(|_| TauriConfigParser::get_current_version(path))
+            TomlParser::get_current_version(path, options)
+                .or_else(|_| PackageJsonParser::get_current_version(path, options))
+                .or_else(|_| TauriConfigParser::get_current_version(path, options))
         }
-        SupportedTypes::PackageJSON => PackageJsonParser::get_current_version(path),
-        SupportedTypes::TauriConfig => TauriConfigParser::get_current_version(path),
+        SupportedTypes::PackageJSON => PackageJsonParser::get_current_version(path, options),
+        SupportedTypes::TauriConfig => TauriConfigParser::get_current_version(path, options),
     }?;
 
     // Increment patch version
