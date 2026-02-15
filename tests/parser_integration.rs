@@ -330,6 +330,69 @@ version = "1.0.0-alpha.1"
 }
 
 // ============================================================================
+// Regression: No Double Quotes
+// ============================================================================
+
+#[test]
+fn test_toml_no_double_quote_after_version() {
+    let temp_dir = TempDir::new().unwrap();
+    let cargo_toml = temp_dir.path().join("Cargo.toml");
+
+    fs::write(
+        &cargo_toml,
+        r#"[package]
+name = "test"
+version = "1.0.0"
+edition = "2024"
+"#,
+    )
+    .unwrap();
+
+    let new_version = Version::parse("2.0.0").unwrap();
+    TomlParser::update_version(temp_dir.path(), &new_version, &WalkOptions::default()).unwrap();
+
+    let content = fs::read_to_string(&cargo_toml).unwrap();
+    assert!(
+        !content.contains(r#"version = "2.0.0""#)
+            || !content.contains(r#"version = "2.0.0"""#),
+        "Double quote detected in output: {}",
+        content
+    );
+    // Ensure the closing quote is followed by a newline, not another quote
+    assert!(
+        content.contains("version = \"2.0.0\"\n") || content.contains("version = \"2.0.0\"\r\n"),
+        "Version line not properly terminated: {}",
+        content
+    );
+}
+
+#[test]
+fn test_package_json_no_double_quote_after_version() {
+    let temp_dir = TempDir::new().unwrap();
+    let package_json = temp_dir.path().join("package.json");
+
+    fs::write(
+        &package_json,
+        r#"{
+  "name": "test",
+  "version": "1.0.0"
+}"#,
+    )
+    .unwrap();
+
+    let new_version = Version::parse("2.0.0").unwrap();
+    PackageJsonParser::update_version(temp_dir.path(), &new_version, &WalkOptions::default())
+        .unwrap();
+
+    let content = fs::read_to_string(&package_json).unwrap();
+    assert!(
+        !content.contains(r#""version": "2.0.0"""#),
+        "Double quote detected in output: {}",
+        content
+    );
+}
+
+// ============================================================================
 // Ignore File Tests
 // ============================================================================
 
@@ -451,4 +514,83 @@ version = "1.0.0"
 
     // Both files found since ignores are disabled
     assert_eq!(updated.len(), 2);
+}
+
+// ============================================================================
+// Prerelease Increment Tests
+// ============================================================================
+
+#[test]
+fn test_increment_prerelease_with_numeric_suffix() {
+    // alpha.0 -> alpha.1
+    let temp_dir = TempDir::new().unwrap();
+    let cargo_toml = temp_dir.path().join("Cargo.toml");
+
+    fs::write(
+        &cargo_toml,
+        r#"[package]
+name = "test"
+version = "0.0.1-alpha.0"
+"#,
+    )
+    .unwrap();
+
+    TomlParser::increment_version(temp_dir.path(), &WalkOptions::default()).unwrap();
+
+    let content = fs::read_to_string(&cargo_toml).unwrap();
+    assert!(
+        content.contains(r#"version = "0.0.1-alpha.1""#),
+        "Expected 0.0.1-alpha.1, got: {}",
+        content
+    );
+}
+
+#[test]
+fn test_increment_prerelease_without_numeric_suffix() {
+    // alpha -> bump patch, keep label
+    let temp_dir = TempDir::new().unwrap();
+    let cargo_toml = temp_dir.path().join("Cargo.toml");
+
+    fs::write(
+        &cargo_toml,
+        r#"[package]
+name = "test"
+version = "0.0.1-alpha"
+"#,
+    )
+    .unwrap();
+
+    TomlParser::increment_version(temp_dir.path(), &WalkOptions::default()).unwrap();
+
+    let content = fs::read_to_string(&cargo_toml).unwrap();
+    assert!(
+        content.contains(r#"version = "0.0.2-alpha""#),
+        "Expected 0.0.2-alpha, got: {}",
+        content
+    );
+}
+
+#[test]
+fn test_increment_prerelease_beta_numeric() {
+    // beta.5 -> beta.6
+    let temp_dir = TempDir::new().unwrap();
+    let cargo_toml = temp_dir.path().join("Cargo.toml");
+
+    fs::write(
+        &cargo_toml,
+        r#"[package]
+name = "test"
+version = "1.0.0-beta.5"
+"#,
+    )
+    .unwrap();
+
+    TomlParser::increment_version(temp_dir.path(), &WalkOptions::default()).unwrap();
+
+    let content = fs::read_to_string(&cargo_toml).unwrap();
+    assert!(
+        content.contains(r#"version = "1.0.0-beta.6""#),
+        "Expected 1.0.0-beta.6, got: {}",
+        content
+    );
 }

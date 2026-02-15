@@ -6,7 +6,7 @@ pub struct PackageJsonParser;
 
 impl Parser for PackageJsonParser {
     fn version_match_regex() -> anyhow::Result<Regex> {
-        Ok(Regex::new(r#"(?m)^(\s*"version"\s*:\s*")([^"]*)"#)?)
+        Ok(Regex::new(r##"(?m)^(\s*"version"\s*:\s*")([^"]*)""##)?)
     }
 
     fn filename_match_regex() -> anyhow::Result<Regex> {

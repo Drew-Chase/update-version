@@ -5,7 +5,7 @@ use semver::Version;
 pub struct TomlParser;
 impl Parser for TomlParser {
     fn version_match_regex() -> anyhow::Result<Regex> {
-        Ok(Regex::new(r#"(?m)^(version\s*=\s*")(\d+\.\d+\.\d+[^"]*)"#)?)
+        Ok(Regex::new(r##"(?m)^(version\s*=\s*")(\d+\.\d+\.\d+[^"]*)""##)?)
     }
 
     fn filename_match_regex() -> anyhow::Result<Regex> {
